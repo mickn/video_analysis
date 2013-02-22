@@ -77,10 +77,10 @@ def get_antfarm_config(vid,fignum=1,cfg_fn=cfg_fn):
 	open(cfg,'w').write(config.__repr__())
 	pylab.close(fignum)
 
-def get_epm_config(vid,fignum=1,cfg_fn=epm_cfg_fn):
+def get_epm_config(vid,fignum=1,cfg_fn=epm_cfg_fn,close_fig=False):
 	pylab.figure(fignum)
 	pylab.clf()
-	fr = vidtools.extract_keyframe(vid)
+	fr = vidtools.extract_keyframe(vid,sec=120)
 	pylab.matshow(fr,fignum=fignum)
 	print >> sys.stderr, 'click 8 arm corners, proceeding clockwise from the top left corner of the top arm'
 	pts = pylab.ginput(8,timeout=0)
@@ -115,7 +115,8 @@ def get_epm_config(vid,fignum=1,cfg_fn=epm_cfg_fn):
 	except:
 		pass
 	open(cfg,'w').write(zones.__repr__())
-	pylab.close(fignum)
+	if close_fig:
+		pylab.close(fignum)
 	
 
 def show_epm_config(pts,zones,fignum):
