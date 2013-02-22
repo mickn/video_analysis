@@ -53,7 +53,7 @@ def current_view_crop(fignum=1,shape=(480,720)):
 
 
 cfg_fn = lambda f: f[:-4]+'-config.dict'
-epm_cfg_fn = lambda f: f[:-4]+'.zones.dict'
+epm_cfg_fn = lambda f: os.path.join(f[:-4],os.path.basename(f[:-4]+'.zones.dict'))
 
 def get_antfarm_config(vid,fignum=1,cfg_fn=cfg_fn):
 	config = {}
@@ -110,6 +110,10 @@ def get_epm_config(vid,fignum=1,cfg_fn=epm_cfg_fn):
 	#	change_pt = raw_input('enter the number of an anchor point to change or press enter to save configuration: ')
 
 	cfg = cfg_fn(vid)
+	try:
+		os.makedirs(os.path.dirname(cfg))
+	except:
+		pass
 	open(cfg,'w').write(zones.__repr__())
 	pylab.close(fignum)
 	
