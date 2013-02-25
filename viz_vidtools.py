@@ -136,58 +136,58 @@ def show_epm_config(pts,zones,fignum):
 	
 
 def calc_epm_zones(pts):
-    outerpts = []
-    m1,b1 = vidtools.line_fx_from_pts(pts[0],pts[1])
-    m2,b2 = vidtools.line_fx_from_pts(pts[7],pts[6])
-    x = (b2-b1)/(m1-m2)
-    y = m2*x+b2
-    outerpts.append((x,y))
-    m2,b2 = vidtools.line_fx_from_pts(pts[2],pts[3])
-    x = (b2-b1)/(m1-m2)
-    y = m2*x+b2
-    outerpts.append((x,y))
-    m1,b1 = vidtools.line_fx_from_pts(pts[4],pts[5])
-    x = (b2-b1)/(m1-m2)
-    y = m2*x+b2
-    outerpts.append((x,y))
-    m2,b2 = vidtools.line_fx_from_pts(pts[7],pts[6])
-    x = (b2-b1)/(m1-m2)
-    y = m2*x+b2
-    outerpts.append((x,y))
-    #X,Y = zip(*outerpts)
-    #scatter(X,Y,c='b',s=50)
-    centerpts = []
-    m1,b1 = vidtools.line_fx_from_pts(pts[0],pts[5])
-    m2,b2 = vidtools.line_fx_from_pts(pts[7],pts[2])
-    x = (b2-b1)/(m1-m2)
-    y = m2*x+b2
-    centerpts.append((x,y))
-    m1,b1 = vidtools.line_fx_from_pts(pts[1],pts[4])
-    x = (b2-b1)/(m1-m2)
-    y = m2*x+b2
-    centerpts.append((x,y))
-    centerpts
-    m2,b2 = vidtools.line_fx_from_pts(pts[6],pts[3])
-    x = (b2-b1)/(m1-m2)
-    y = m2*x+b2
-    centerpts.append((x,y))
-    m1,b1 = vidtools.line_fx_from_pts(pts[0],pts[5])
-    x = (b2-b1)/(m1-m2)
-    y = m2*x+b2
-    centerpts.append((x,y))
-    #X,Y = zip(*centerpts)
-    #scatter(X,Y,c='g',s=50)
-    zones = {}
-    zones['F1'] = [outerpts[0],pts[0],centerpts[0],pts[7]]
-    zones['F2'] = [pts[1],outerpts[1],pts[2],centerpts[1]]
-    zones['F3'] = [centerpts[2],pts[3],outerpts[2],pts[4]]
-    zones['F4'] = [pts[6],centerpts[3],pts[5],outerpts[3]]
-    zones['OT'] = [pts[0],pts[1],centerpts[1],centerpts[0]]
-    zones['OB'] = [centerpts[3],centerpts[2],pts[4],pts[5]]
-    zones['CR'] = [centerpts[1],pts[2],pts[3],centerpts[2]]
-    zones['CL'] = [pts[7],centerpts[0],centerpts[3],pts[6]]
-    zones['M'] = centerpts
-    return zones
+	if len(pts) != 8:
+		print >> sys.stderr, 'argument must be list of length 8; length is %s. argument pts:\n%s' % (len(pts),pts)
+		raise ValueError
+	else:
+		outerpts = []
+		m1,b1 = vidtools.line_fx_from_pts(pts[0],pts[1])
+		m2,b2 = vidtools.line_fx_from_pts(pts[7],pts[6])
+		x = (b2-b1)/(m1-m2)
+		y = m2*x+b2
+		outerpts.append((x,y))
+		m2,b2 = vidtools.line_fx_from_pts(pts[2],pts[3])
+		x = (b2-b1)/(m1-m2)
+		y = m2*x+b2
+		outerpts.append((x,y))
+		m1,b1 = vidtools.line_fx_from_pts(pts[4],pts[5])
+		x = (b2-b1)/(m1-m2)
+		y = m2*x+b2
+		outerpts.append((x,y))
+		m2,b2 = vidtools.line_fx_from_pts(pts[7],pts[6])
+		x = (b2-b1)/(m1-m2)
+		y = m2*x+b2
+		outerpts.append((x,y))
+		centerpts = []
+		m1,b1 = vidtools.line_fx_from_pts(pts[0],pts[5])
+		m2,b2 = vidtools.line_fx_from_pts(pts[7],pts[2])
+		x = (b2-b1)/(m1-m2)
+		y = m2*x+b2
+		centerpts.append((x,y))
+		m1,b1 = vidtools.line_fx_from_pts(pts[1],pts[4])
+		x = (b2-b1)/(m1-m2)
+		y = m2*x+b2
+		centerpts.append((x,y))
+		centerpts
+		m2,b2 = vidtools.line_fx_from_pts(pts[6],pts[3])
+		x = (b2-b1)/(m1-m2)
+		y = m2*x+b2
+		centerpts.append((x,y))
+		m1,b1 = vidtools.line_fx_from_pts(pts[0],pts[5])
+		x = (b2-b1)/(m1-m2)
+		y = m2*x+b2
+		centerpts.append((x,y))
+		zones = {}
+		zones['F1'] = [outerpts[0],pts[0],centerpts[0],pts[7]]
+		zones['F2'] = [pts[1],outerpts[1],pts[2],centerpts[1]]
+		zones['F3'] = [centerpts[2],pts[3],outerpts[2],pts[4]]
+		zones['F4'] = [pts[6],centerpts[3],pts[5],outerpts[3]]
+		zones['OT'] = [pts[0],pts[1],centerpts[1],centerpts[0]]
+		zones['OB'] = [centerpts[3],centerpts[2],pts[4],pts[5]]
+		zones['CR'] = [centerpts[1],pts[2],pts[3],centerpts[2]]
+		zones['CL'] = [pts[7],centerpts[0],centerpts[3],pts[6]]
+		zones['M'] = centerpts
+		return zones
 
 def draw_reanalysis_activity_summary(re_adir,source_adir,fig=1,outformat=None):
 	'''given a reanalysis directory and a source directory, generates a figure showing previous and concurrent activity from source
