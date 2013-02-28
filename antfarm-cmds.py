@@ -69,7 +69,7 @@ for cfg in sorted(glob('*/*-config.dict')):
     elif donebase in currjobs:
         print >> sys.stderr, 'running'
     else:
-        cmd = 'summarize_segment_opencv.py -l %s -s 60 -nf 300 -np 60 -ns 4 -gi 0.03 -ac %s -vs np60nf300ns4 %s' % (seglen,cfg,vid)
+        cmd = 'summarize_segment_opencv.py -l %s -s 60 -nf 300 -np 60 -ns 4 -gi 0.03 -oe shapely -ac %s -vs np60nf300ns4shapely %s' % (seglen,cfg,vid)
         logfile = donebase+'.lsflog'
         ss = run_safe.safe_script(cmd,donebase,force_write=True)
         subcmd = 'bsub -q %s -o %s %s' % (q,logfile,ss)
