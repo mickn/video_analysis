@@ -1,6 +1,8 @@
 #!/usr/bin/env python
-import matplotlib
-matplotlib.use('Agg')
+import vidtools
+# Not necessary; done in vidtools
+#import matplotlib
+#matplotlib.use('Agg')
 
 import os,sys,re,numpy
 import time, datetime, itertools, tarfile
@@ -16,7 +18,7 @@ import pylab
 def get_win(i,start,stop,wins):
     return i/((stop-start)/wins)
 
-def init_objects(stream,frames,currsum,denom,seglen,cutoff,frames_offset,SHAPE,size_h,size_bins,fol_h,fol_bins,transform=''):
+def init_objects(stream,frames,currsum,denom,seglen,cutoff,frames_offset,SHAPE,size_h,size_bins,fol_h,fol_bins,transform='',outline_engine='homebrew'):
     hsl = seglen/2
     min_arc_score = (2*max(size_h))+max(fol_h) #score of a "perfect" object arc of length 2
     ols = []
@@ -29,7 +31,13 @@ def init_objects(stream,frames,currsum,denom,seglen,cutoff,frames_offset,SHAPE,s
         last_frames.append(frames[0])
 	frames_offset += 1
 	mm = vidtools.shift_frames_return_diff(stream,frames,currsum,denom,seglen,transform=transform)
-	ol = vidtools.chain_outlines_from_mask(mm>cutoff,preshrink=1,debug=False,return_termini=False,order_points=True,sort_outlines=False) #order_points should be True
+        if outline_engine == 'homebrew':
+            ol = vidtools.chain_outlines_from_mask(mm>cutoff,preshrink=1,debug=False,return_termini=False,order_points=True,sort_outlines=False) #order_points should be True
+        elif outline_engine == 'shapely':
+            ol = vidtools.chain_outlines_from_mask_shapely(mm>cutoff,preshrink=1)
+        else:
+            print >> sys.stderr, 'outline_engine must be one of %s' % (['homebrew','shapely'])
+            raise ValueError
 	ols.append(ol)
 	print >> sys.stderr, '\r%s %s ' % (i,c.next()),
 
@@ -54,7 +62,7 @@ def init_objects(stream,frames,currsum,denom,seglen,cutoff,frames_offset,SHAPE,s
     print >> sys.stderr, 'object initialization complete in', str(datetime.timedelta(seconds=int(time.time() - t)))
     return ols,ols_offset,frames_offset,objs,splits,objs_sizes,objs_fols,prelast_avg,prelast_mm,to_retire_objs,to_retire_objs_sizes,to_retire_objs_fols
 
-def advance_analysis(ols,ols_offset,objs,splits,objs_sizes,objs_fols,to_retire_objs,to_retire_objs_sizes,to_retire_objs_fols,last_frames,stream,frames,currsum,denom,seglen,cutoff,frames_offset,SHAPE,size_h,size_bins,fol_h,fol_bins,transform=''):
+def advance_analysis(ols,ols_offset,objs,splits,objs_sizes,objs_fols,to_retire_objs,to_retire_objs_sizes,to_retire_objs_fols,last_frames,stream,frames,currsum,denom,seglen,cutoff,frames_offset,SHAPE,size_h,size_bins,fol_h,fol_bins,transform='',outline_engine='homebrew'):
     '''
     given current state objects, proceeds a single frame with all steps
     (advances frames, finds movement, extends object arcs)
@@ -66,7 +74,14 @@ def advance_analysis(ols,ols_offset,objs,splits,objs_sizes,objs_fols,to_retire_o
     mm = vidtools.shift_frames_return_diff(stream,frames,currsum,denom,seglen,transform=transform)
 
     #find blobs
-    ol = vidtools.chain_outlines_from_mask(mm>cutoff,preshrink=1,debug=False,return_termini=False,order_points=True,sort_outlines=False)
+    if outline_engine == 'homebrew':
+        ol = vidtools.chain_outlines_from_mask(mm>cutoff,preshrink=1,debug=False,return_termini=False,order_points=True,sort_outlines=False)
+    elif outline_engine == 'shapely':
+        ol = vidtools.chain_outlines_from_mask_shapely(mm>cutoff,preshrink=1)
+    else:
+        print >> sys.stderr, 'outline_engine must be one of %s' % (['homebrew','shapely'])
+        raise ValueError
+
     
     #shift blob outlines
     ols_offset += 1
@@ -147,6 +162,8 @@ if __name__ == "__main__":
     parser.add_argument('-zc','--zone_config',default=None,type=str,help='config file for tracked zones (named locations in frame)'+ds)
     
     parser.add_argument('-tr','--transform',default='',type=str,choices=['','invert','absval'],help='transform frame intensities (tracks dark object on light background)'+ds)
+
+    parser.add_argument('-oe','--outline_engine',default='homebrew',type=str,choices=['homebrew','shapely'],help='switch between homebrew and shapely chain_outlines calls (shapely should be faster and more accurate, but requires working shapely python library and libgeos_c)'+ds)
 
     parser.add_argument('-vs','--video_suffix',default=None,type=str,help='write summary video with this suffix if supplied'+ds)
     
@@ -239,7 +256,7 @@ if __name__ == "__main__":
     retired_objs_fols = {}
 
     #init object arcs
-    ols,ols_offset,frames_offset,objs,splits,objs_sizes,objs_fols,prelast_avg,prelast_mm,to_retire_objs,to_retire_objs_sizes,to_retire_objs_fols = init_objects(stream,frames,currsum,denom,opts.seglen,cutoff,frames_offset,SHAPE,size_h,size_bins,fol_h,fol_bins,transform=opts.transform)
+    ols,ols_offset,frames_offset,objs,splits,objs_sizes,objs_fols,prelast_avg,prelast_mm,to_retire_objs,to_retire_objs_sizes,to_retire_objs_fols = init_objects(stream,frames,currsum,denom,opts.seglen,cutoff,frames_offset,SHAPE,size_h,size_bins,fol_h,fol_bins,transform=opts.transform,outline_engine=opts.outline_engine)
 
     if opts.antfarm_config:
         prelast_masked = prelast_avg.copy()
@@ -308,7 +325,7 @@ if __name__ == "__main__":
             ols_offset, frames_offset = advance_analysis(ols,ols_offset,objs,splits,objs_sizes,objs_fols, \
                                                          to_retire_objs,to_retire_objs_sizes,to_retire_objs_fols, \
                                                          last_frames,stream,frames,currsum,denom,opts.seglen,cutoff,frames_offset, \
-                                                         SHAPE,size_h,size_bins,fol_h,fol_bins,transform=opts.transform)
+                                                         SHAPE,size_h,size_bins,fol_h,fol_bins,transform=opts.transform,outline_engine=opts.outline_engine)
         last_avg = vidtools.average_frames(last_frames)
         last_mm = vidtools.mousemask_from_object_arcs(frames_offset-len(last_frames),frames_offset,min_arc_score,ols,ols_offset, \
                                                         Util.merge_dictlist([objs,to_retire_objs]), \
@@ -339,10 +356,16 @@ if __name__ == "__main__":
                 m[last_mm] = True #add mousemask to burrow area
                 m[vidtools.grow_mask(vidtools.shrink_mask(prevactmask,1),1)] = False #MASK PREVIOUS DIGGING
                 m[groundmask] = False #AND EVERYTHING ABOVE FIRST GROUND
-                newactols.append(vidtools.chain_outlines_from_mask(m,preshrink=1,grow_by=1,debug=False,return_termini=False,order_points=True,sort_outlines=False))
-                
+                if opts.outline_engine == 'homebrew':
+                    newactols.append(vidtools.chain_outlines_from_mask(m,preshrink=1,grow_by=1,debug=False,return_termini=False,order_points=True,sort_outlines=False))
+                    prevol = vidtools.chain_outlines_from_mask(prevactmask,preshrink=1,grow_by=1,debug=False,return_termini=False,order_points=True,sort_outlines=False)
+                elif opts.outline_engine == 'shapely':
+                    newactols.append(vidtools.chain_outlines_from_mask_shapely(m,preshrink=1,grow_by=1))
+                    prevol = vidtools.chain_outlines_from_mask_shapely(prevactmask,preshrink=1,grow_by=1)
+                else:
+                    print >> sys.stderr, 'outline_engine must be one of %s' % (['homebrew','shapely'])
+                    raise ValueError
                 digol = newactols[-1]
-                prevol = vidtools.chain_outlines_from_mask(prevactmask,preshrink=1,grow_by=1,debug=False,return_termini=False,order_points=True,sort_outlines=False)
             else:
                 digol = []
                 prevol = []

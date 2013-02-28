@@ -1,3 +1,4 @@
+from shapely.geometry import MultiPoint,Polygon
 #try to use a non-interactive backend, as this speeds plot generation
 import matplotlib
 matplotlib.use('Agg') #will fail with warning if another backend is already loaded; this is fine
@@ -1395,7 +1396,8 @@ def shrink_mask(mask,shrinkby):
         return values
 
 def merge_polygons(polys,shape=(480,720),start_trace=(360,240),growby=0,preshrink=0):
-    '''merges polygons by first generating binary masks of included areas and subsequently tracing the sum area
+    '''SHOULD REPLACE WITH PROGRESSIVE UNION FROM SHAPELY
+    merges polygons by first generating binary masks of included areas and subsequently tracing the sum area
     
     polys should be a list of lists, which contain tuples 
     consider reduce(lambda x,y: x+y, deep_polys) where deep_polys is a list of lists of lists of tuples, 
@@ -1584,6 +1586,80 @@ def order_points(pts,mask):
         left -= set([p0])
     return outline
 
+
+def chain_outlines_from_mask_shapely(mask,grow_by=0,preshrink=1,xybounds=None,border=5,interp_dist=0.01,\
+                                     preserve_topology=True,debug=False):
+    
+
+    if debug:
+        now = time.time()
+        start = now
+
+    
+    if border > 0:
+        ydim,xdim = mask.shape
+        newmask = numpy.zeros((ydim+2*border,xdim+2*border),dtype='bool')
+        newmask[border:-border,border:-border] = mask
+    else:
+        newmask = mask.copy()
+
+    if debug:
+        print time.time()-now,'set border'	
+        now = time.time()
+    
+    if preshrink:
+        newmask = shrink_mask(newmask,preshrink)
+        newmask = grow_mask(newmask,preshrink)
+    if grow_by:
+        newmask = grow_mask(newmask,grow_by)
+
+    if debug:
+        print time.time()-now,'shrink/grow'	
+        now = time.time()
+    
+    #no need to proceed if no blobs to trace!
+    if not newmask.any():
+        return []
+
+    pts = points_from_mask(newmask)
+    polys = MultiPoint(pts).buffer(1).buffer(-1).simplify(0.01,preserve_topology=preserve_topology)
+
+    if debug:
+        print time.time()-now,'trace blobs'	
+        now = time.time()
+    
+    ols = []
+    try:
+        if isinstance(polys,Polygon):
+            polys = [polys]
+        for poly in polys:
+            ols.append([])
+            for x,y in numpy.array(poly.exterior):
+                p = (int(round(x)),int(round(y)))
+                if len(ols[-1]) == 0 or ols[-1][-1] != p:
+                    ols[-1].append(p)
+    except TypeError:
+        print >> sys.stderr, 'type of polys is %s looks like:\n\n%s' % (type(polys),polys)
+        raise
+
+    if debug:
+        print time.time()-now,'filter traces'	
+        now = time.time()
+
+    resetouts = []
+    for p in ols:
+        resetp = []
+        for x,y in p:
+            resetp.append((x-border,y-border))
+        resetouts.append(resetp)
+
+    if debug:
+        print time.time()-now,'reset outlines'	
+        now = time.time()
+        print 'total %s' % (now-start)
+        
+    return resetouts
+
 def chain_outlines_from_mask(mask,origin=(0,0),grow_by=0,preshrink=1,xybounds=None,border=5,\
 			     return_termini=True,order_points=True,sort_outlines=True,debug=False):
     '''given a mask returns a list of polygons (lists of (x,y) point tuples)
@@ -1593,6 +1669,7 @@ def chain_outlines_from_mask(mask,origin=(0,0),grow_by=0,preshrink=1,xybounds=No
     xybounds not currently implemented'''
     if debug:
         now = time.time()
+        start = now
     
     if border > 0:
         ydim,xdim = mask.shape
@@ -1722,6 +1799,7 @@ def chain_outlines_from_mask(mask,origin=(0,0),grow_by=0,preshrink=1,xybounds=No
     if debug:
         print time.time()-now,'fix border'	
         now = time.time()
+        print 'total %s' % (now-start)	
         
     if return_termini:
         return resetouts,resetterms
