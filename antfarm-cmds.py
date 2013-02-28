@@ -1,3 +1,37 @@
+#assuming transcode_all.py run regularly and all full 720p data is present in transcoded mp4
+from video_analysis import vidtools,viz_vidtools
+import os
+
+#vid = '20110915-0_BW-66/merge6mbit_720.mp4'
+fr = vidtools.extract_keyframe(vid)
+matshow(fr)
+
+cropsdict = {}
+#zoom on first analysis area
+cropsdict['BW-66'] = viz_vidtools.current_view_crop(1,fr.shape)
+#zoom on next, repeat until all stored
+#бн
+#write cropsdict
+cdf = os.path.join(os.path.dirname(vid),'cropsdict.dict')
+open(cdf,'w').write(cropsdict.__repr__())
+
+
+#for videos with un-analyzable leader or end:
+#start at beginning
+offset = 0
+#end at 11:00
+endtime = (11*60*60)+(0*60)
+dur = endtime - offset
+offset,dur
+#  prints (0, 40740)
+
+close(1)
+
+#launch crop streams
+!vid2crop.py $vid $offset $dur $cdf
+
+
+
 # GET CONFIGS
 from video_analysis import viz_vidtools
 from glob import glob
