@@ -1,4 +1,9 @@
-from shapely.geometry import MultiPoint,Polygon
+try:
+    from shapely.geometry import MultiPoint,Polygon
+except:
+    import warnings
+    warnings.warn('shapely import failed (likely pylab conflict); shapely features unavailable')
+    
 #try to use a non-interactive backend, as this speeds plot generation
 import matplotlib
 matplotlib.use('Agg') #will fail with warning if another backend is already loaded; this is fine
@@ -35,7 +40,7 @@ def array_from_stream(stream,img_smooth_kernel=None,normed=True):
        	m = Util.normalize(m)
     return m
 
-def mat_polys2cv(m,polys=[],hatchpolys=[],lines=[],dpi=80,scale=1):
+def mat_polys2cv(m,polys=[],hatchpolys=[],lines=[],dpi=80,scale=1,bars=[]):
     '''NOTE: differs from initial version in that polys is now (color,polygon_pts) tuples list
     for a bare list of polygon points <pp>, consider calling with polys=iplot.subspec_enum(pp)
     hatchpolys is 3-tuple (color,hatch,poly)
@@ -53,6 +58,9 @@ def mat_polys2cv(m,polys=[],hatchpolys=[],lines=[],dpi=80,scale=1):
     if len(lines) > 0:
         for c,(X,Y) in lines:
             pylab.plot(X,Y,c)
+    if len(bars) > 0:
+        for c, (X,Y,bottom,kwargs) in bars:
+            pylab.bar(X,Y,color=c,edgecolor=c,bottom=bottom,**kwargs)
     pylab.xticks([])
     pylab.yticks([])
     pylab.plot()
@@ -930,6 +938,118 @@ def calc_split_mat_for_groundtrace(frame,offset):
         split.append(ar)
     return numpy.array(split).transpose()
 
+def calc_diff_mat(frame,offset):
+    dm = numpy.zeros(frame.shape,dtype=float)
+    for i in xrange(offset,dm.shape[0]-offset):
+        for j in xrange(offset,dm.shape[1]-offset):
+            perim = []
+            perim.extend(frame[i-offset,j-offset+1:j+offset])
+            perim.extend(frame[i+offset,j-offset+1:j+offset])
+            perim.extend(frame[i-offset+1:i+offset,j-offset])
+            perim.extend(frame[i-offset+1:i+offset,j+offset])
+            dm[i,j] = frame[i,j] - numpy.mean(perim)
+    return dm
+
+def rec_max(vec,pos,maxstep=None,_start=None,_step=0):
+    maxpos = numpy.argmax(vec[pos-1:pos+2])
+    if maxstep is not None:
+        if _step == 0:
+            _start = pos
+        _step += 1
+    if maxstep is not None and _step>maxstep:
+        return _start
+    if maxpos == 1:
+        return pos
+    else:
+        return rec_max(vec,pos-1+maxpos,maxstep,_start,_step)
+
+def find_ground_over_frames_matrix(frames,start_ground_anchors,end_ground_anchors,ahead_window=10,ahead_avg=5,fix_deviation=0.5,allow_passes=100,max_step_limit=None):
+    '''20130326 BEST OPTION
+    given frames (segment averages) as either list of 2D arrays (coverts to 3D array)
+    or 3D array, and anchor points for first and last grounds
+    ("ground_anchors" and "end_ground_anchors" in antfarm config)
+
+    returns "surface" (list of lists of ground Y coords through time) of best ground
+    '''
+    from copy import deepcopy
+    
+    if type(frames) == list:
+        frames = numpy.array(frames)
+    print >> sys.stderr, 'calculate derivatives'
+    frames_deriv = frames[:,1:,:] - frames[:,:-1,:]
+    print >> sys.stderr, 'Z transform'
+    frames_deriv_Z = numpy.array([Util.zscore(frames_deriv[:,:,x]) for x in xrange(frames_deriv.shape[2])]).transpose((1,2,0))
+    ld = dict(start_ground_anchors)
+    l = [ld.get(i,None) for i in xrange(frames[0].shape[1])]
+    fit_l = [rec_max(frames_deriv_Z[0][:,x],anchor,max_step_limit) for x,anchor in enumerate(Util.smooth(l,5,interpolate_nones=True))]
+    fit_surface = [fit_l]
+    print >> sys.stderr, 'trace 1'
+    for m in frames_deriv_Z[1:]:
+        fit_l = [rec_max(m[:,x],anchor,max_step_limit) for x,anchor in enumerate(fit_surface[-1])]
+        fit_surface.append(fit_l)
+
+    #return fit_surface
+
+    eld = dict(end_ground_anchors)
+    el = [eld.get(i,None) for i in range(frames[0].shape[1])]
+    end_fit_l = [rec_max(frames_deriv_Z[-1][:,x],anchor,max_step_limit) for x,anchor in enumerate(Util.smooth(el,5,interpolate_nones=True))]
+    match_x = [x for x,y in enumerate(end_fit_l) if y == fit_surface[-1][x]]
+
+    #return fit_surface,match_x
+
+    filt_fit_surface = []
+    print >> sys.stderr, 'trace 2'
+    for iter,(fit_l,m) in enumerate(zip(fit_surface,frames_deriv_Z)):
+        this_ld = dict([(x,fit_l[x]) for x in match_x])
+        this_l = [this_ld.get(i,None) for i in xrange(frames[0].shape[1])]
+
+        #filt_fit_l = Util.smooth(this_l,5,interpolate_nones=True)
+        filt_fit_l = [rec_max(m[:,x],anchor,max_step_limit) for x,anchor in enumerate(Util.smooth(this_l,5,interpolate_nones=True))]
+
+        filt_fit_surface.append(filt_fit_l)
+        print >> sys.stderr, '\r %s/%s' % (iter+1,len(fit_surface)),
+
+    #return filt_fit_surface
+
+    new_gs = filt_fit_surface
+    redo = True
+    passes = 0
+    print >> sys.stderr, '\nlocal fix'
+    while redo:
+        redo = False
+        old_gs = new_gs
+        new_gs = []
+        for g in old_gs:
+            new_gs.append([g[0]])
+            for i,p in enumerate(g[1:-1],1):
+                ev = ((g[i+1]-g[i-1])/2.0)+g[i-1]
+                if -fix_deviation < p-ev < fix_deviation:
+                    new_gs[-1].append(p)
+                else:
+                    new_gs[-1].append(ev)
+                    redo = True
+            new_gs[-1].append(g[-1])
+        passes += 1
+        print >> sys.stderr, '\r %s' % passes,
+        if passes >= allow_passes:
+            break
+
+    print >> sys.stderr, '\nfuture fix'
+    gs_futurefix = deepcopy(new_gs)
+    for x in range(len(new_gs[0])):
+        for t in range(1,len(new_gs)-ahead_window-ahead_avg):
+            future_val = numpy.mean([new_gs[ft][x] for ft in range(t+ahead_window,t+ahead_window+ahead_avg)])
+            if (new_gs[t][x] - future_val)**2 > (new_gs[t-1][x] - future_val)**2:
+                gs_futurefix[t][x] = new_gs[t-1][x]
+    print >> sys.stderr, '\nrevoke ground lowering'
+    for t in range(1,len(gs_futurefix)):
+        for x in range(len(gs_futurefix[t])):
+            if gs_futurefix[t][x] > gs_futurefix[t-1][x]:
+                gs_futurefix[t][x] = gs_futurefix[t-1][x]
+
+    print >> sys.stderr, 'DONE'
+    return gs_futurefix
+
 def find_ground4(frame,groundpts,recursion=5,be=None,xybounds=None):
     '''given a list of ground points (can be ground_start from both ends) and an intensity matrix
     returns a ground array calculated as the best of a set of maximum_value_path computes
@@ -1164,7 +1284,73 @@ def maximum_value_path(mat,startpoint,endpoint,horizon=10,prox_to_end=10,kill=10
             
     #print >> sys.stderr, 'finished'
     return score,path
-	
+
+def find_burrow_over_frames_matrix(frames,mousemasks,grounds,suppress_ground,predug_poly=None,diff_min=0.2):
+    '''first_segment_actouts takes contents of first segment burrow tracking from first-pass.
+    if None, first segment will always be un-tracked (since i-1 and i+1 are required for burrow finding)
+
+    diff_min is difference in average intensity to call burrow; 0.2 taken from summarize_segment_opencv hard-code
+    (since mousemask is principally driving burrow calls, this is probably not crucial)
+    '''
+    SHAPE = frames[0].shape
+    if predug_poly is None:
+        pd_config_mask = numpy.zeros(SHAPE,dtype=bool)
+    else:
+        pd_config_mask = mask_from_outline(outline_from_polygon(predug_poly),SHAPE)
+
+    if type(frames) == list:
+        frames = numpy.array(frames)
+
+    prevactmask = numpy.zeros(SHAPE,dtype=bool)
+    pdmask = numpy.zeros(SHAPE,dtype=bool)
+    groundmask = numpy.zeros(SHAPE,dtype=bool)
+    prevactols = []
+    newactols = []
+    pdols = []
+    
+    print >> sys.stderr, 'track burrowing'
+    for i,(fr,mm,g) in enumerate(zip(frames,mousemasks,grounds)):
+        #add last new (if any) to previous
+        if newactols and newactols[-1]:
+                prevactmask += reduce(lambda x,y:x+y, [mask_from_outline(ol,SHAPE) for ol in newactols[-1]])
+
+        if 1 < i < len(frames)-1:
+            diffmat = frames[i-1] - frames[i+1]
+        else:
+            diffmat = numpy.zeros(SHAPE)
+
+        groundmask[grow_mask(mask_from_vector(g,SHAPE),suppress_ground)] = True
+        
+        m = diffmat > 0.2
+        m[mm] = True #add mousemask to burrow area
+        m[grow_mask(shrink_mask(prevactmask,1),1)] = False #MASK PREVIOUS DIGGING
+        m[pdmask] = False #AND PREDUG
+        m[groundmask] = False #AND EVERYTHING ABOVE GROUND
+
+        newols = chain_outlines_from_mask_shapely(m,preshrink=1,grow_by=1)
+        prevols = chain_outlines_from_mask_shapely(prevactmask,preshrink=1,grow_by=1)
+
+        newactols.append([])
+        pdols.append([])
+        prevactols.append(prevols)
+        
+        for ol in newols:
+            try:
+                olmask = mask_from_outline(ol,SHAPE)
+                if any(olmask[pd_config_mask]):
+                    pdmask[olmask] = True
+                    pdols[-1].append(ol)
+                else:
+                    newactols[-1].append(ol)
+            except:
+                pass
+        print >> sys.stderr, '\r %s / %s' % (i+1,len(frames)),
+
+    print >> sys.stderr, 'DONE'
+    return pdmask,pdols,prevactols,newactols
+    
+
+
 def calculate_cumulative_activity(analysis_dir,zcut,suppress_ground=40,shape=(480,720),be=None,write_files=True,force_all=False,xybounds=None,use_ground=None,preshrink=2):
     '''given a directory containing .actmat and .ground files, iteratively calculates new subterranean activity'''
     actfiles = sorted(glob(os.path.join(analysis_dir,'*.actmat')))
@@ -1931,6 +2117,7 @@ def merge_obj_arc_data(parent_obj_id, candidate_child_obj_ids, idxs_replace, ols
 
     #handle missing overlap between last of pre-split and first of best_arc
     #print >> sys.stderr, 'parent_obj_id: %s best_arc_id: %s\n\tsplits dict: %s parent len: %s' % (parent_obj_id,best_arc_id,splits,len(objs[parent_obj_id]))
+
     missing_ol = fol_from_obj_arc(ol_ids_to_relative([objs[parent_obj_id][-1],objs[best_arc_id][0]],ols_offset),ols,SHAPE)[0]
 
     objs[parent_obj_id].extend(objs.pop(best_arc_id))
@@ -2338,6 +2525,17 @@ def chain_outlines_from_mask_old(mask,origin=(0,0),grow_by=0,preshrink=2,xybound
     #return outlines,termini
     return resetouts,resetterms
 
+def outline_from_polygon(poly):
+    pd_poly = []
+    for itr in range(len(poly)):
+        i = itr-1
+        m,b = line_fx_from_pts(map(float,poly[i]),poly[i+1])
+        step = poly[i][0] < poly[i+1][0] and 1 or -1
+        edge = [(x,m*x+b) for x in xrange(int(poly[i][0]),int(poly[i+1][0]),step)]
+        pd_poly.extend(edge)
+
+    return pd_poly
+
 def mask_from_outline(outline,shape):
     '''given dimensions (shape), generates a bool mask that is True inside shape outline (list of (x,y) coords)'''
     #print >> sys.stderr, "generate mask from outline:",outline
@@ -2356,12 +2554,21 @@ def mask_from_outline(outline,shape):
             bot = xsorted.pop(0)
             while xsorted and xsorted[0][0] == bot[0] and xsorted[0][1] == bot[1]+1:
                 bot = xsorted.pop(0)
-            newmask[top[0]][top[1]:bot[1]+1] = True
+            try:
+                newmask[top[0]][top[1]:bot[1]+1] = True
+            except IndexError:
+                pass
         elif drop:
-            newmask[top[0]][top[1]:drop[1]+1] = True
+            try:
+                newmask[top[0]][top[1]:drop[1]+1] = True
+            except IndexError:
+                pass
         else:
             #print top
-            newmask[top[0]][top[1]] = True
+            try:
+                newmask[top[0]][top[1]] = True
+            except IndexError:
+                pass
         
     return newmask.transpose()
 
@@ -2375,6 +2582,14 @@ def subtract_outline(ol,frame,replace_with = None):
     #		if sub_mask[i,j]: frame[i,j] = replace_with
     #SMART:
     frame[sub_mask] = replace_with
+
+def subtract_masks(frame,masks,replace_with=None):
+    if replace_with is None:
+        replace_with = numpy.mean(frame[:50,:50])
+    sum_masks = reduce(lambda x,y: x+y, masks)
+    frame_copy = frame.copy()
+    frame_copy[sum_masks] = replace_with
+    return frame_copy
 
 def size_of_polygon(p):
     '''given a polygon outline (list of points) returns the size in pixels of the encompassed area'''

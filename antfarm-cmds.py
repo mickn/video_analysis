@@ -1,6 +1,7 @@
 #assuming transcode_all.py run regularly and all full 720p data is present in transcoded mp4
 from video_analysis import vidtools,viz_vidtools
 import os
+import run_safe
 
 #vid = '20110915-0_BW-66/merge6mbit_720.mp4'
 fr = vidtools.extract_keyframe(vid)

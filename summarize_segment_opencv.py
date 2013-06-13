@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import vidtools
+
 # Not necessary; done in vidtools
 #import matplotlib
 #matplotlib.use('Agg')
@@ -151,6 +152,7 @@ if __name__ == "__main__":
     parser.add_argument('-np','--nparts',default=100,type=int,help='number of segments to analyze during parameter fitting (only if -mt not set)'+ds)
     parser.add_argument('-ns','--nstep',default=1,type=int,help='number of segments to space parameter fit parts by during parameter fitting (only if -mt not set)'+ds)
     parser.add_argument('-q','--queue',default='normal_serial',type=str,help='LSF queue for parameter fitting (only if -mt not set)'+ds)
+    parser.add_argument('-tc','--threshold_coeff',default=1.0,type=float,help='multiply best fit mouse threshold by threshold_coeff (e.g. set to 1.2 to increase stringency of mouse tracking by 20%)'+ds)
     
     parser.add_argument('-l','--seglen',default=900,type=int,help='number of frames to average for object tracking background subtraction; see vidtools.init_frames()'+ds)
     
@@ -164,7 +166,8 @@ if __name__ == "__main__":
     parser.add_argument('-tr','--transform',default='',type=str,choices=['','invert','absval'],help='transform frame intensities (tracks dark object on light background)'+ds)
 
     parser.add_argument('-oe','--outline_engine',default='homebrew',type=str,choices=['homebrew','shapely'],help='switch between homebrew and shapely chain_outlines calls (shapely should be faster and more accurate, but requires working shapely python library and libgeos_c)'+ds)
-
+    parser.add_argument('--max_itertime',default=1800,type=int,help='maximum average interation time in seconds to permit after 5 interations (if average segment loop time exceeds this value, terminate)'+ds)
+    
     parser.add_argument('-vs','--video_suffix',default=None,type=str,help='write summary video with this suffix if supplied'+ds)
     
     parser.add_argument('vid',help='video file to process')
@@ -211,8 +214,14 @@ if __name__ == "__main__":
         cutoff_rank,cutoff = vidtools.choose_cutoff(scores,cut_step) #or cut_step*2
         size_h,size_bins,fol_h,fol_bins = dists[cutoff]
         min_arc_score = (2*max(size_h))+max(fol_h)
-        thresh_str = 'auto-thresh-%0.3f' % cutoff
-        print >> sys.stderr, 'mouse intensity threshold %0.3f chosen' % cutoff
+        if opts.threshold_coeff == 1:
+            thresh_str = 'auto-thresh-%0.3f' % cutoff
+            print >> sys.stderr, 'mouse intensity threshold %0.3f chosen' % cutoff
+        else:
+            orig_cutoff = cutoff
+            cutoff *= opts.threshold_coeff
+            thresh_str = 'coeff-%0.3f-thresh-%0.3f' % (opts.threshold_coeff,cutoff)
+            print >> sys.stderr, 'mouse intensity threshold %0.3f chosen after %s threshold coefficient (original: %s)' % (cutoff,opts.threshold_coeff,orig_cutoff)
     else:
         cutoff = opts.mouse_threshold
         thresh_str = 'man-thresh-%0.3f' % cutoff
@@ -279,9 +288,9 @@ if __name__ == "__main__":
 
     i=0
 
-    param_str = '%s-%s_seg%s_%s-vs%s' % (target_frame_start,target_frame_stop,opts.seglen,thresh_str,opts.video_suffix)
+    param_str = '%s-%s_seg%s_%s-%s' % (target_frame_start,target_frame_stop,opts.seglen,thresh_str,opts.video_suffix)
     if opts.video_suffix:
-        vidout = opts.vid[:-4]+'_%s_%s.avi' % (param_str,opts.video_suffix)
+        vidout = opts.vid[:-4]+'_%s.avi' % (param_str)
         print >> sys.stderr, 'write output video to %s' % vidout
         try:
             os.unlink(vidout)
@@ -437,6 +446,10 @@ if __name__ == "__main__":
         times.append(this_time)
         avg_time = int(numpy.mean(times))
         print >> sys.stderr, i, '/', analyze_hsls, 'done in',str(datetime.timedelta(seconds=this_time)),'avg loop time',str(datetime.timedelta(seconds=avg_time)),'done in',str(datetime.timedelta(seconds=avg_time*(analyze_hsls-i)))
+        if i > 5 and avg_time > opts.max_itertime:
+            errstr = 'mean iteration time %s after %s rounds exceeds max %s' % (avg_time,i+1,opts.max_itertime)
+            raise ValueError, errstr
+            
 
 
     open(os.path.join(analysis_root,'objs.dict'),'w').write(dict(retired_objs.items()+to_retire_objs.items()+objs.items()).__repr__())
