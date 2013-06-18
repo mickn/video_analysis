@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use('Agg') #will fail with warning if another backend is already loaded; this is fine
 import pylab
 
-from PIL import Image,ImageFilter
+from PIL import Image,ImageFilter,ImageDraw
 from glob import glob
 import os, sys, re, Util, LSF, numpy, subprocess, shutil, time, io
 from collections import defaultdict
@@ -2537,6 +2537,11 @@ def outline_from_polygon(poly):
     return pd_poly
 
 def mask_from_outline(outline,shape):
+    img = Image.new('L', tuple(reversed(shape)), 0)
+    ImageDraw.Draw(img).polygon(outline, outline=1, fill=1)
+    return numpy.array(img)
+
+def mask_from_outline_old(outline,shape):
     '''given dimensions (shape), generates a bool mask that is True inside shape outline (list of (x,y) coords)'''
     #print >> sys.stderr, "generate mask from outline:",outline
     xsorted = sorted(outline)
