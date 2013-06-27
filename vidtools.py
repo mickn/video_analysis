@@ -2536,10 +2536,22 @@ def outline_from_polygon(poly):
 
     return pd_poly
 
+def distance_to_edge_mat(poly,SHAPE):
+    mask = mask_from_outline(poly,SHAPE)
+    dmat = numpy.zeros(mask.shape,dtype=float)
+    for x in xrange(dmat.shape[0]):
+        for y in xrange(dmat.shape[1]):
+            if mask[x,y]:
+                dmat[x,y] = min(distance_from_point(poly,(y,x)))
+    return dmat                                    
+
 def mask_from_outline(outline,shape):
+    if len(outline) < 2:
+        return numpy.zeros(shape,dtype=bool)
+
     img = Image.new('L', tuple(reversed(shape)), 0)
     ImageDraw.Draw(img).polygon(outline, outline=1, fill=1)
-    return numpy.array(img)
+    return numpy.array(img).astype(bool)
 
 def mask_from_outline_old(outline,shape):
     '''given dimensions (shape), generates a bool mask that is True inside shape outline (list of (x,y) coords)'''
@@ -2612,6 +2624,21 @@ def center_of_polygon(p):
     mask = mask_from_outline(p,(ymax+2,xmax+2))
     pts = points_from_mask(mask)
     return max([(hypotenuse(closest_point(p,pt),pt),pt) for pt in pts])[1]
+
+def calc_coordMat(SHAPE):
+    return numpy.array([[tuple((i,j)) for j in range(SHAPE[1])] for i in range(SHAPE[0])])
+
+def centroid(ol,SHAPE,coordMat=None):
+    '''
+    given a list of points <ol> and 2-tuple SHAPE return centroid of ol
+    if coordMat is None, compute from SHAPE (significantly slower)
+    to calculate coordMat independently, see calc_coordMat()
+    '''
+
+    if coordMat is None:
+        coordMat = calc_coordMat(SHAPE)
+    m = mask_from_outline(ol,SHAPE)
+    return tuple(reversed(map(numpy.mean,zip(*coordMat[m])))) 
 
 def is_edge(mask,point,xybounds=None):
     '''returns true if the value (x,y) (i.e. mask[y,x]) is true, and an adjacent cell is false'''

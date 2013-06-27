@@ -7,7 +7,7 @@ import LSF,run_safe
 
 job_ram = 30000
 MAX_RETRY = 3
-queue = 'normal_serial'
+queue = 'hoekstra'
 FORCE_PAR = True
 
 if len(sys.argv) == 3:

@@ -66,7 +66,7 @@ def get_crop_config_show(vid,fignum=1):
 
 sec_from_tup = lambda tup: (tup[0]*60*60)+(tup[1]*60)+tup[2]
 
-def get_crop_config_write(vid,cropsdict,start_tup=None,end_tup=None):
+def get_crop_config_write(vid,cropsdict,start_tup=None,end_tup=None,queue='hoekstra'):
 	'''given video and cropsdict (see get_crop_config_show)
 	and optional start and end (should be (h,m,s) tuples or None)
 	write config and submit cropping run.'''
@@ -83,7 +83,7 @@ def get_crop_config_write(vid,cropsdict,start_tup=None,end_tup=None):
 	
 	donebase = os.path.splitext(vid)[0]+'-vid2crop'
 	ss = run_safe.safe_script(cmd,donebase,force_write=True)
-	bsub_cmd = 'bsub -q normal_serial -o %s.lsflog %s' % (donebase,ss)
+	bsub_cmd = 'bsub -q %s -o %s.lsflog %s' % (queue,donebase,ss)
 	os.system(bsub_cmd)
 
 
