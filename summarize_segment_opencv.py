@@ -450,7 +450,18 @@ if __name__ == "__main__":
             errstr = 'mean iteration time %s after %s rounds exceeds max %s' % (avg_time,i+1,opts.max_itertime)
             raise ValueError, errstr
             
-
+    #write current lasts
+    Util.append_obj2tar(ols[:hsl], last_miceols_file, tarfiles['miceols'])
+    Util.append_ar2tar(last_mm, last_mousemask_file, tarfiles['mousemasks'])
+    Util.append_ar2tar(last_avg, last_segavg_file, tarfiles['segavgs'])
+    #Util.append_obj2tar(to_retire_objs, retired_objs_file, tarfiles['objs'])
+    #Util.append_obj2tar(to_retire_objs_fols, retired_objs_fols_file, tarfiles['objs_fols'])
+    #Util.append_obj2tar(to_retire_objs_sizes, retired_objs_sizes_file, tarfiles['objs_sizes'])
+    if opts.antfarm_config:
+        Util.append_obj2tar(prevol, last_prevactols_file, tarfiles['prevact_ols'])
+        Util.append_obj2tar(digol, last_newactols_file, tarfiles['newact_ols'])
+        Util.append_obj2tar(last_ground, last_ground_file, tarfiles['grounds'])
+        Util.append_ar2tar(ddmat, last_digdiff_file, tarfiles['digdiffs'])
 
     open(os.path.join(analysis_root,'objs.dict'),'w').write(dict(retired_objs.items()+to_retire_objs.items()+objs.items()).__repr__())
     open(os.path.join(analysis_root,'objs_sizes.dict'),'w').write(dict(retired_objs_sizes.items()+to_retire_objs_sizes.items()+objs_sizes.items()).__repr__())
