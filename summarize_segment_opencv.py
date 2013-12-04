@@ -145,6 +145,7 @@ if __name__ == "__main__":
     
     parser.add_argument('-s','--start',default=0,type=int,help='start of target analysis segment in seconds'+ds)
     parser.add_argument('-e','--stop',default=None,type=int,help='end of target analysis segment in seconds'+ds)
+    parser.add_argument('-f','--fps',default=None,type=float,help='force framerate in frames-per-second'+ds)
 
     parser.add_argument('-mt','--mouse_threshold',default=None,type=float,help='intensity difference threshold for mouse tracking'+ds)
 
@@ -183,7 +184,10 @@ if __name__ == "__main__":
     #load openCV stream
     stream = cv.CaptureFromFile(opts.vid)
     #get video framerate
-    fps = float(cv.GetCaptureProperty(stream,cv.CV_CAP_PROP_FPS))
+    if opts.fps is None:
+        fps = float(cv.GetCaptureProperty(stream,cv.CV_CAP_PROP_FPS))
+    else:
+    	fps = opts.fps
     
     min_start_sec = int(opts.seglen/fps)
     if opts.start < min_start_sec:
