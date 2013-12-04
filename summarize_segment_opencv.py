@@ -314,7 +314,7 @@ if __name__ == "__main__":
     open(os.path.join(analysis_root,'SHAPE'),'w').write(SHAPE.__repr__())
     times = []
     
-    while i < analyze_hsls:
+    while i <= analyze_hsls:
         last_miceols_file = '%07d-%07d-mice_ols.list' % (frames_offset,frames_offset+hsl)
         retired_objs_file = '%07d-%07d-retired_objs.dict' % (frames_offset,frames_offset+hsl)
         retired_objs_fols_file = '%07d-%07d-retired_objs_fols.dict' % (frames_offset,frames_offset+hsl)
