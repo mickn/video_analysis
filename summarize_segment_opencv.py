@@ -241,7 +241,7 @@ if __name__ == "__main__":
     
     analyze_hsls = int((frame_stop-target_frame_start)/hsl) # i THINK you go init (=1 seg); analyze until target+1seg
 
-    print >> sys.stderr, 'target_frame_start: %s\nframe_start: %s\ntarget_frame_stop: %s\nframe_stop: %s\nhsl: %s\nanalyze_hsls: %s ' % (target_frame_start,frame_start,target_frame_stop,frame_stop,hsl,analyze_hsls)
+    print >> sys.stderr, 'target_frame_start: %s\nframe_start: %s\ntarget_frame_stop: %s\nframe_stop: %s\nhsl: %s\nanalyze_hsls: %s\nframerate: %s' % (target_frame_start,frame_start,target_frame_stop,frame_stop,hsl,analyze_hsls,fps)
 
     vidtools.seek_in_stream(stream,frame_start)
     frames_offset = frame_start
