@@ -449,7 +449,20 @@ if __name__ == "__main__":
         if i > 5 and avg_time > opts.max_itertime:
             errstr = 'mean iteration time %s after %s rounds exceeds max %s' % (avg_time,i+1,opts.max_itertime)
             raise ValueError, errstr
-            
+
+
+    last_miceols_file = '%07d-%07d-mice_ols.list' % (frames_offset,frames_offset+hsl)
+    retired_objs_file = '%07d-%07d-retired_objs.dict' % (frames_offset,frames_offset+hsl)
+    retired_objs_fols_file = '%07d-%07d-retired_objs_fols.dict' % (frames_offset,frames_offset+hsl)
+    retired_objs_sizes_file = '%07d-%07d-retired_objs_sizes.dict' % (frames_offset,frames_offset+hsl)
+    last_mousemask_file = '%07d-%07d-mousemask.mat' % (frames_offset,frames_offset+hsl)
+    last_segavg_file = '%07d-%07d-segavg.mat' % (frames_offset,frames_offset+hsl)
+    if opts.antfarm_config:
+        last_prevactols_file = '%07d-%07d-prevact_ols.list' % (frames_offset,frames_offset+hsl)
+        last_newactols_file = '%07d-%07d-newact_ols.list' % (frames_offset,frames_offset+hsl)
+        last_ground_file = '%07d-%07d-ground.list' % (frames_offset,frames_offset+hsl)
+        last_digdiff_file = '%07d-%07d-digdiff.mat' % (frames_offset,frames_offset+hsl)
+
     #write current lasts
     Util.append_obj2tar(ols[:hsl], last_miceols_file, tarfiles['miceols'])
     Util.append_ar2tar(last_mm, last_mousemask_file, tarfiles['mousemasks'])
