@@ -401,6 +401,43 @@ def load_cached_mouse_hist2d_segments(hist2d_tarf,outlines_tarf,SHAPE,return_siz
 	else:
 		return mm_hists
 
+def present_analysis_result(analysis_dir,pdfviewer='xpdf'):
+	import submit_summarize_runs
+	
+	pdfs = glob(os.path.join(analysis_dir,'*summary.pdf'))
+	donebase = submit_summarize_runs.donebase_from_analysis_dir(analysis_dir)
+	checked = donebase+'.checked'
+	if os.path.exists(checked):
+		print >> sys.stderr, '%s checked' % analysis_dir
+	elif len(pdfs) == 0:
+		print >> sys.stderr, 'no activity_summary.pdf files found in %s' % analysis_dir
+	else:
+		for pdf in pdfs:
+			os.system('xpdf %s 2> /dev/null &' % pdf)
+		result = raw_input('input:\n 1 (accept)\n 2 (reject)\n\nfollowed by <return>: ')
+		if result == '1':
+			print >> sys.stderr, 'write\n %s' % checked
+			ret = os.system('touch %s' % checked)
+			if ret == 0 and os.path.exists(checked):
+				pass
+			else:
+				raise OSError, 'unable to write checked'
+		else:
+			attempts = ['%s-ATTEMPTS/attemptforce%s' % (donebase,i) for i in range(submit_summarize_runs.MAX_RETRY)]
+			donefile = donebase+'.done'
+			print >> sys.stderr, 'remove\n %s\nwrite\n %s' % (donefile,' '.join(attempts))
+			ret = os.system('rm %s' % donefile)
+			if not os.path.exists(donefile):
+				pass
+			else:
+				raise OSError, 'unable to remove done'
+			for attempt in attempts:
+				ret = os.system('touch %s' % attempt)
+				if ret == 0 and os.path.exists(attempt):
+					pass
+				else:
+					raise OSError, 'unable to write attempt'
+
 def draw_rainbowtron_opencv(analysis_dir,fig=1,outformat='pdf',vid_fps=30,graph_height=0.2, \
 			    bkgd_data='fullmice',spectrum_len=None,dawn_min=None,activity_percentile_plot=0.5, \
 			    hill_bounds=None,skip_first=0,hsl_per_min=2,set_hill_max=None,set_dig_max=None, \

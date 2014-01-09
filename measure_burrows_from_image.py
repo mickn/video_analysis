@@ -6,7 +6,7 @@ import numpy, pylab, sys, os
 import vidtools, iplot, Util
 from PIL import Image
 
-def load_image(im_file):
+def load_image(im):
 	ar = numpy.asarray(Image.open(im).convert(mode='L'))
 	return ar
 
@@ -51,6 +51,7 @@ def add_straight_tunnel(tunnels,tunnel_oris,horiz,this_name,parent_name=None,upd
 	specify start and end of straight line.  if parent_name is None, treat as hillside
 	if update_plot, draws all tunnels in figure specified (e.g. update_plot == 1; plot in figure 1)
 	'''
+	print >> sys.stderr, 'click start and end'
 	tunnels[this_name] = pylab.ginput(2,0)
 	if parent_name is not None:
 		tunnel_oris[this_name] = parent_name
@@ -78,6 +79,85 @@ def add_curved_tunnel(tunnels,tunnel_oris,horiz,this_name,parent_name=None,updat
 	if update_plot:
 		plot_tunnels(tunnels,horiz,update_plot)
 
+def next_burrow_number(tund,prefix):
+	existing = [0]+[int(k[len(prefix):].split('.')[0]) for k in tund['tunnels'].keys() if k.startswith(prefix) and not 'hill' in k]
+	return max(existing)+1
+
+def next_segment_parents_options(tund,prefix,burrow_number):
+	existing = [int(k[len(prefix):].split('.')[1]) for k in tund['tunnels'].keys() if k.startswith('%s%s.' % (prefix,burrow_number)) and not 'hill' in k]
+	return existing
+
+def measure_image(im,fignum=1):
+	ar = load_image(im)
+	ax = pylab.matshow(ar,fignum=fignum)
+	pylab.gray()
+	#ymax = round(ax.get_ybound()[1])
+	#xmax = round(ax.get_xbound()[1])
+	ymax,xmax = ar.shape
+
+	#initialize empty dict
+	tund = {'tunnels':{},'tunnel_oris':{}}
+
+	#calibrate and show calibration
+	get_calibration(fignum=fignum,pct_wide=0.4,pct_high=0.4,tunneldicts=tund)
+	plot_tunnels(**tund)
+
+	pylab.xlim(0,xmax)
+	pylab.ylim(ymax,0)
+	pylab.plot()
+	#nll=raw_input('<>')
+	add_another = True
+	while add_another:
+		print >> sys.stderr, '\nCLICK IN FIGURE TO REFRESH\n'
+		nll=pylab.ginput(1,0)
+		prefix = raw_input('burrow location prefix (ML/MR/HL/HR) or 0 to review and save:')
+
+		if prefix == '0':
+			add_another = False
+			print >> sys.stderr, '%s' % [(k,calc_tunnel_properties(k,**tund)) for k in tund['tunnels'] if '.' in k]
+			tosave = raw_input('choose:\n 1) save analysis\n 2) discard\n\nand press <enter>: ')
+			if tosave == '1':
+				save_tunnels(im,**tund)
+			elif tosave == '2':
+				print >> sys.stderr, 'discarding'
+			pylab.close(fignum)
+			break
+		
+		if not prefix+'hill' in tund['tunnels'].keys():
+			print >> sys.stderr, 'click hill points'
+			add_straight_tunnel(this_name=prefix+'hill',update_plot=1,**tund)
+
+		burrow_number = next_burrow_number(tund,prefix)
+		
+		next_segment = True
+		while next_segment:
+			print >> sys.stderr, '\nCLICK IN FIGURE TO REFRESH\n'
+			nll=pylab.ginput(1,0)
+			parent_options = next_segment_parents_options(tund,prefix,burrow_number)
+			if len(parent_options) == 0:
+				parent = prefix+'hill'
+				segment_number = 1
+			else:
+				parent_number = raw_input('choose parent tunnel, or 0 to complete this burrow, or enter a tunnel number to re-measure (e.g. 1.1) and press <enter>: %s: ' % parent_options)
+				if parent_number == '0':
+					next_segment = False
+					break
+				elif '.' in parent_number:
+					parent = tund['tunnel_oris'][prefix+parent_number]
+					segment_number = parent_number.split('.')[1]
+				else:
+					parent = '%s%s.%s' % (prefix,burrow_number,parent_number)
+					segment_number = max(parent_options) + 1
+			this = '%s%s.%s' % (prefix,burrow_number,segment_number)
+			fn = raw_input('next tunnel function:\n 1) add_straight_tunnel\n 2) add_curved_tunnel\n 3) end burrow\n\nchoose one [1|2|3] and press <enter>: ')
+			if fn == '1':
+				add_straight_tunnel(this_name=this,parent_name=parent,update_plot=1,**tund)
+			elif fn == '2':
+				add_curved_tunnel(this_name=this,parent_name=parent,update_plot=1,**tund)
+			elif fn == '3':
+				next_segment = False
+			else:
+				print >> sys.stderr, 'choose from options [1,2]'
 
 def tunnel_len(tun,cm_factor=1):
 	p1 = tun[0]

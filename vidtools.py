@@ -2640,6 +2640,61 @@ def centroid(ol,SHAPE,coordMat=None):
     m = mask_from_outline(ol,SHAPE)
     return tuple(reversed(map(numpy.mean,zip(*coordMat[m])))) 
 
+def centroids_from_mouseols_tar(tarf,centfile=None):
+    import tarfile
+    if centfile and os.path.exists(centfile):
+        centroids = numpy.load(centfile)
+        print >> sys.stderr, 'centroid output %s exists; load %s frames from file' % (centfile,len(centroids))
+        return centroids
+    
+    tarh = tarfile.open(tarf)
+    tarn = tarh.getnames()
+    SHAPE = eval(open(os.path.dirname(tarf)+'/SHAPE').read())
+    cm = calc_coordMat(SHAPE)
+    mice = Util.tar2obj(tarn[0],tarh)
+    hsl = len(mice)
+    centroids = numpy.zeros((hsl*len(tarn),2),dtype=int)
+    print >> sys.stderr, 'load %s half-segments of length %s; array dimensions: %s' % (len(tarn),hsl,centroids.shape)
+    for i,n in enumerate(tarn):
+        print >> sys.stderr, '\r%s/%s' % (i,len(tarn)),
+        for j,oll in enumerate(Util.tar2obj(n,tarh)):
+            if len(oll) == 1:
+                x,y = centroid(oll[0],SHAPE,cm)
+                centroids[(i*hsl)+j,0] = int(x)
+                centroids[(i*hsl)+j,1] = int(y)
+
+    if centfile:
+        numpy.save(open(centfile,'wb'),centroids)
+        
+    return centroids
+                                                        
+def centroids_to_mean_rate(centroids,binwidth):
+    '''binwidth = half segment length, eg'''
+    allmeans = []
+    alllens = []
+    thisarc = []
+    last = (0,0)
+    dist_by_bin = []
+    for i,(x,y) in enumerate(centroids):
+        if i%int(binwidth) == 0:
+            if thisarc:
+                allmeans.append(numpy.mean(thisarc))
+                alllens.append(len(thisarc))
+                thisarc = []
+            m = numpy.mean(allmeans)
+            dist_by_bin.append(m>0 and m or None) #,numpy.mean(alllens),len(allmeans),sum(alllens)
+            allmeans = []
+            alllens = []
+        if last != (0,0) and (x,y) != (0,0):
+            thisarc.append(hypotenuse(last,(x,y)))
+        else:
+            if thisarc:
+                allmeans.append(numpy.mean(thisarc))
+                alllens.append(len(thisarc))
+                thisarc = []
+        last = (x,y)
+    return dist_by_bin[1:]
+
 def is_edge(mask,point,xybounds=None):
     '''returns true if the value (x,y) (i.e. mask[y,x]) is true, and an adjacent cell is false'''
     if mask[point[1],point[0]]:
