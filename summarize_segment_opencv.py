@@ -145,6 +145,7 @@ if __name__ == "__main__":
     
     parser.add_argument('-s','--start',default=0,type=int,help='start of target analysis segment in seconds'+ds)
     parser.add_argument('-e','--stop',default=None,type=int,help='end of target analysis segment in seconds'+ds)
+    parser.add_argument('-f','--fps',default=None,type=float,help='force framerate in frames-per-second'+ds)
 
     parser.add_argument('-mt','--mouse_threshold',default=None,type=float,help='intensity difference threshold for mouse tracking'+ds)
 
@@ -183,7 +184,10 @@ if __name__ == "__main__":
     #load openCV stream
     stream = cv.CaptureFromFile(opts.vid)
     #get video framerate
-    fps = float(cv.GetCaptureProperty(stream,cv.CV_CAP_PROP_FPS))
+    if opts.fps is None:
+        fps = float(cv.GetCaptureProperty(stream,cv.CV_CAP_PROP_FPS))
+    else:
+    	fps = opts.fps
     
     min_start_sec = int(opts.seglen/fps)
     if opts.start < min_start_sec:
@@ -236,6 +240,8 @@ if __name__ == "__main__":
     frame_stop = target_frame_stop + opts.seglen
     
     analyze_hsls = int((frame_stop-target_frame_start)/hsl) # i THINK you go init (=1 seg); analyze until target+1seg
+
+    print >> sys.stderr, 'target_frame_start: %s\nframe_start: %s\ntarget_frame_stop: %s\nframe_stop: %s\nhsl: %s\nanalyze_hsls: %s\nframerate: %s' % (target_frame_start,frame_start,target_frame_stop,frame_stop,hsl,analyze_hsls,fps)
 
     vidtools.seek_in_stream(stream,frame_start)
     frames_offset = frame_start
@@ -314,7 +320,7 @@ if __name__ == "__main__":
     open(os.path.join(analysis_root,'SHAPE'),'w').write(SHAPE.__repr__())
     times = []
     
-    while i < analyze_hsls:
+    while i <= analyze_hsls:
         last_miceols_file = '%07d-%07d-mice_ols.list' % (frames_offset,frames_offset+hsl)
         retired_objs_file = '%07d-%07d-retired_objs.dict' % (frames_offset,frames_offset+hsl)
         retired_objs_fols_file = '%07d-%07d-retired_objs_fols.dict' % (frames_offset,frames_offset+hsl)
@@ -449,8 +455,32 @@ if __name__ == "__main__":
         if i > 5 and avg_time > opts.max_itertime:
             errstr = 'mean iteration time %s after %s rounds exceeds max %s' % (avg_time,i+1,opts.max_itertime)
             raise ValueError, errstr
-            
 
+
+    last_miceols_file = '%07d-%07d-mice_ols.list' % (frames_offset,frames_offset+hsl)
+    retired_objs_file = '%07d-%07d-retired_objs.dict' % (frames_offset,frames_offset+hsl)
+    retired_objs_fols_file = '%07d-%07d-retired_objs_fols.dict' % (frames_offset,frames_offset+hsl)
+    retired_objs_sizes_file = '%07d-%07d-retired_objs_sizes.dict' % (frames_offset,frames_offset+hsl)
+    last_mousemask_file = '%07d-%07d-mousemask.mat' % (frames_offset,frames_offset+hsl)
+    last_segavg_file = '%07d-%07d-segavg.mat' % (frames_offset,frames_offset+hsl)
+    if opts.antfarm_config:
+        last_prevactols_file = '%07d-%07d-prevact_ols.list' % (frames_offset,frames_offset+hsl)
+        last_newactols_file = '%07d-%07d-newact_ols.list' % (frames_offset,frames_offset+hsl)
+        last_ground_file = '%07d-%07d-ground.list' % (frames_offset,frames_offset+hsl)
+        last_digdiff_file = '%07d-%07d-digdiff.mat' % (frames_offset,frames_offset+hsl)
+
+    #write current lasts
+    Util.append_obj2tar(ols[:hsl], last_miceols_file, tarfiles['miceols'])
+    Util.append_ar2tar(last_mm, last_mousemask_file, tarfiles['mousemasks'])
+    Util.append_ar2tar(last_avg, last_segavg_file, tarfiles['segavgs'])
+    #Util.append_obj2tar(to_retire_objs, retired_objs_file, tarfiles['objs'])
+    #Util.append_obj2tar(to_retire_objs_fols, retired_objs_fols_file, tarfiles['objs_fols'])
+    #Util.append_obj2tar(to_retire_objs_sizes, retired_objs_sizes_file, tarfiles['objs_sizes'])
+    if opts.antfarm_config:
+        Util.append_obj2tar(prevol, last_prevactols_file, tarfiles['prevact_ols'])
+        Util.append_obj2tar(digol, last_newactols_file, tarfiles['newact_ols'])
+        Util.append_obj2tar(last_ground, last_ground_file, tarfiles['grounds'])
+        Util.append_ar2tar(ddmat, last_digdiff_file, tarfiles['digdiffs'])
 
     open(os.path.join(analysis_root,'objs.dict'),'w').write(dict(retired_objs.items()+to_retire_objs.items()+objs.items()).__repr__())
     open(os.path.join(analysis_root,'objs_sizes.dict'),'w').write(dict(retired_objs_sizes.items()+to_retire_objs_sizes.items()+objs_sizes.items()).__repr__())
