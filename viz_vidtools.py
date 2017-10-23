@@ -4,7 +4,8 @@ will fail [semi]gracefully if an interactive backend is already loaded
 import matplotlib
 matplotlib.use('Agg')
 
-import pylab,os,sys,re,Util,iplot,tarfile,math
+from py_util import Util, iplot
+import pylab,os,sys,re,tarfile,math
 from PIL import Image
 from glob import glob
 import vidtools
@@ -124,7 +125,7 @@ def get_antfarm_config(vid,fignum=1,cfg_fn=cfg_fn,force=False):
 	open(cfg,'w').write(config.__repr__())
 	pylab.close(fignum)
 
-def get_epm_config(vid,fignum=1,cfg_fn=epm_cfg_fn,close_fig=False):
+def get_epm_config(vid,sec,fignum=1,cfg_fn=epm_cfg_fn,close_fig=False):
 	pylab.figure(fignum)
 	pylab.clf()
 	fr = vidtools.extract_keyframe(vid,sec=120)
