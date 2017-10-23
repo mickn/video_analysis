@@ -1,5 +1,5 @@
-import sys
-sys.path.append('/Users/mick/Projects/py_util')
+#import sys
+#sys.path.append('/Users/mick/Projects/py_util')
 
 try:
     from shapely.geometry import MultiPoint,Polygon
