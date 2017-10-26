@@ -14,14 +14,15 @@ import pylab
 
 from PIL import Image,ImageFilter,ImageDraw
 from glob import glob
-import os, sys, re, Util, LSF, numpy, subprocess, shutil, time, io
+from py_util import Util, LSF
+import os, sys, re, numpy, subprocess, shutil, time, io
 from collections import defaultdict
-try:
-    import cv
-    cv_found = True
-except:
-    print >> sys.stderr, "opencv bindings import failed; disabled"
-    cv_found = False
+#try:
+    #import cv
+    # cv_found = True
+# except:
+#     print >> sys.stderr, "opencv bindings import failed; disabled"
+#     cv_found = False
 
 ###################################
 # OPENCV HELPERS

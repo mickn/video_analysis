@@ -5,12 +5,13 @@ import matplotlib
 matplotlib.use('Agg')
 
 from py_util import Util, iplot
-import pylab,os,sys,re,tarfile,math
+import os,sys,re,tarfile,math
+import matplotlib.pyplot as pylab
 from PIL import Image
 from glob import glob
 import vidtools
 import numpy
-import run_safe
+from py_util import run_safe
 
 
 col = {0:'w',1:'r',2:'y',3:'g',4:'b',5:'c'}
@@ -129,14 +130,14 @@ def get_epm_config(vid,sec,fignum=1,cfg_fn=epm_cfg_fn,close_fig=False):
 	pylab.figure(fignum)
 	pylab.clf()
 	fr = vidtools.extract_keyframe(vid,sec=120)
-	pylab.matshow(fr,fignum=fignum)
+	print fr
+        pylab.matshow(fr)
 	print >> sys.stderr, 'click 8 arm corners, proceeding clockwise from the top left corner of the top arm'
 	pts = pylab.ginput(8,timeout=0)
 	zones = calc_epm_zones(pts)
-	
 	show_epm_config(pts,zones,fignum)
-	pylab.ylim(fr.shape[0],0)
-	pylab.xlim(0,fr.shape[1])
+        pylab.ylim(fr.shape[0],0)
+        pylab.xlim(0,fr.shape[1])
 
 	print >> sys.stderr, 'click to revise points or press enter to accept and write configuration'
 	change_pt = pylab.ginput(1,timeout=0)
